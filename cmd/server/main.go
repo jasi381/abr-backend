@@ -14,6 +14,7 @@ import (
 
 	"github.com/jasi381/abr-backend/internal/api"
 	"github.com/jasi381/abr-backend/internal/config"
+	"github.com/jasi381/abr-backend/internal/events"
 	"github.com/jasi381/abr-backend/internal/storage"
 	"github.com/jasi381/abr-backend/internal/storage/s3store"
 	"github.com/jasi381/abr-backend/internal/store"
@@ -44,14 +45,19 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	hub := events.NewHub()
 
-	wk := worker.New(cfg, st, blob, log)
-	wk.Start(ctx)
+	// Workers get their own context so in-flight HTTP requests can finish
+	// before ffmpeg is stopped.
+	workCtx, stopWork := context.WithCancel(context.Background())
+	defer stopWork()
+	wk := worker.New(cfg, st, blob, hub, log)
+	wk.Start(workCtx)
 	if n := wk.Recover(); n > 0 {
 		log.Info("re-queued unfinished videos", "count", n)
 	}
 
-	srv := api.New(cfg, st, blob, wk, log)
+	srv := api.New(cfg, st, blob, wk, hub, log)
 	httpSrv := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           srv.Handler(),
@@ -59,10 +65,11 @@ func run(log *slog.Logger) error {
 		IdleTimeout:       2 * time.Minute,
 		// No Read/WriteTimeout: uploads and progress streams are long-lived.
 	}
+	httpSrv.RegisterOnShutdown(srv.CloseStreams)
 
 	errCh := make(chan error, 1)
 	go func() {
-		log.Info("listening", "addr", cfg.Addr, "storage", cfg.Storage)
+		log.Info("listening", "addr", cfg.Addr, "storage", cfg.Storage, "workers", cfg.Workers)
 		errCh <- httpSrv.ListenAndServe()
 	}()
 
@@ -74,9 +81,13 @@ func run(log *slog.Logger) error {
 	case <-ctx.Done():
 		log.Info("shutting down")
 	}
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	return httpSrv.Shutdown(shutdownCtx)
+	err = httpSrv.Shutdown(shutdownCtx)
+	stopWork() // kills running ffmpeg; those videos resume on next start
+	wk.Wait()
+	return err
 }
 
 func openBlob(ctx context.Context, cfg config.Config) (storage.Blob, error) {

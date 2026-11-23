@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/jasi381/abr-backend/internal/config"
+	"github.com/jasi381/abr-backend/internal/events"
 	"github.com/jasi381/abr-backend/internal/storage"
 	"github.com/jasi381/abr-backend/internal/store"
 )
@@ -18,6 +19,7 @@ type Worker struct {
 	cfg   config.Config
 	store *store.Store
 	blob  storage.Blob
+	hub   *events.Hub // may be nil
 	log   *slog.Logger
 
 	queue chan string
@@ -29,11 +31,12 @@ type Worker struct {
 }
 
 // New creates a worker. Call Start before Enqueue.
-func New(cfg config.Config, st *store.Store, blob storage.Blob, log *slog.Logger) *Worker {
+func New(cfg config.Config, st *store.Store, blob storage.Blob, hub *events.Hub, log *slog.Logger) *Worker {
 	return &Worker{
 		cfg:     cfg,
 		store:   st,
 		blob:    blob,
+		hub:     hub,
 		log:     log,
 		queue:   make(chan string, 256),
 		running: map[string]context.CancelFunc{},
@@ -114,23 +117,35 @@ func (w *Worker) run(parent context.Context, id string) {
 	}
 }
 
+// advance saves a change and tells anyone watching this video.
+func (w *Worker) advance(id string, typ events.Type, fn func(*store.Video)) error {
+	v, err := w.store.Update(id, fn)
+	if err != nil {
+		return err
+	}
+	w.hub.Publish(id, events.Event{Type: typ, Video: v})
+	return nil
+}
+
 func (w *Worker) fail(id string, err error) {
-	_, _ = w.store.Update(id, func(v *store.Video) {
+	_ = w.advance(id, events.Failed, func(v *store.Video) {
 		v.Status = store.StatusFailed
 		v.Error = err.Error()
 	})
 }
 
 func (w *Worker) setStatus(id string, s store.Status) error {
-	_, err := w.store.Update(id, func(v *store.Video) { v.Status = s })
-	return err
+	return w.advance(id, events.Step, func(v *store.Video) { v.Status = s })
 }
 
 func (w *Worker) setProgress(id, rendition string, pct int) {
-	_, _ = w.store.Update(id, func(v *store.Video) {
+	if _, err := w.store.Update(id, func(v *store.Video) {
 		if v.Progress == nil {
 			v.Progress = map[string]int{}
 		}
 		v.Progress[rendition] = pct
-	})
+	}); err != nil {
+		return
+	}
+	w.hub.Publish(id, events.Event{Type: events.Progress, Rendition: rendition, Percent: pct})
 }

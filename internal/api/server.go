@@ -8,9 +8,11 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"sync"
 	"time"
 
 	"github.com/jasi381/abr-backend/internal/config"
+	"github.com/jasi381/abr-backend/internal/events"
 	"github.com/jasi381/abr-backend/internal/storage"
 	"github.com/jasi381/abr-backend/internal/store"
 )
@@ -27,12 +29,16 @@ type Server struct {
 	store *store.Store
 	blob  storage.Blob
 	jobs  Jobs
+	hub   *events.Hub
 	log   *slog.Logger
+
+	closing   chan struct{}
+	closeOnce sync.Once
 }
 
 // New builds the server. jobs may be nil (uploads are then stored but not processed).
-func New(cfg config.Config, st *store.Store, blob storage.Blob, jobs Jobs, log *slog.Logger) *Server {
-	return &Server{cfg: cfg, store: st, blob: blob, jobs: jobs, log: log}
+func New(cfg config.Config, st *store.Store, blob storage.Blob, jobs Jobs, hub *events.Hub, log *slog.Logger) *Server {
+	return &Server{cfg: cfg, store: st, blob: blob, jobs: jobs, hub: hub, log: log, closing: make(chan struct{})}
 }
 
 // Handler returns the routed, logged http.Handler.
@@ -44,6 +50,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /videos", s.handleCreateVideo)
 	mux.HandleFunc("GET /videos", s.handleListVideos)
 	mux.HandleFunc("GET /videos/{id}", s.handleGetVideo)
+	mux.HandleFunc("GET /videos/{id}/events", s.handleEvents)
 	mux.HandleFunc("DELETE /videos/{id}", s.handleDeleteVideo)
 	mux.HandleFunc("GET /hls/{id}/{path...}", s.handleHLS)
 	return s.logRequests(mux)

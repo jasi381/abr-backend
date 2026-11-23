@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/jasi381/abr-backend/internal/events"
 	"github.com/jasi381/abr-backend/internal/storage"
 	"github.com/jasi381/abr-backend/internal/store"
 )
@@ -175,6 +176,7 @@ func (s *Server) handleDeleteVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	os.Remove(s.cfg.SpoolPath(v.ID, filepath.Ext(v.SourceKey)))
+	s.hub.Publish(v.ID, events.Event{Type: events.Deleted})
 	w.WriteHeader(http.StatusNoContent)
 }
 

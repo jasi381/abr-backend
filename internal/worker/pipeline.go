@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/jasi381/abr-backend/internal/events"
 	"github.com/jasi381/abr-backend/internal/media"
 	"github.com/jasi381/abr-backend/internal/store"
 )
@@ -44,7 +45,7 @@ func (w *Worker) process(ctx context.Context, id string) error {
 		return err
 	}
 	plan := media.Plan(info, w.cfg.KeyframeSeconds)
-	if _, err := w.store.Update(id, func(v *store.Video) {
+	if err := w.advance(id, events.Step, func(v *store.Video) {
 		v.Source = &store.SourceInfo{
 			Width: info.Width, Height: info.Height, FPS: info.FPS,
 			VideoCodec: info.VideoCodec, HasAudio: info.HasAudio, Duration: info.Duration,
@@ -77,7 +78,7 @@ func (w *Worker) process(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := w.store.Update(id, func(v *store.Video) {
+	if err := w.advance(id, events.Step, func(v *store.Video) {
 		v.Renditions = renditions
 		v.Status = store.StatusPublishing
 	}); err != nil {
@@ -89,7 +90,7 @@ func (w *Worker) process(ctx context.Context, id string) error {
 	if err != nil {
 		return fmt.Errorf("publish: %w", err)
 	}
-	if _, err := w.store.Update(id, func(v *store.Video) {
+	if err := w.advance(id, events.Ready, func(v *store.Video) {
 		v.MasterKey = masterKey
 		v.ThumbKey = thumbKey
 		v.Status = store.StatusReady
