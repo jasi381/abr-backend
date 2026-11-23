@@ -23,6 +23,7 @@ func (w *Worker) process(ctx context.Context, id string) error {
 	if err := os.RemoveAll(work); err != nil { // leftovers from an interrupted run
 		return err
 	}
+	defer os.RemoveAll(work) // chunks live in storage once published; on failure we retry from scratch
 	hlsDir := filepath.Join(work, "hls")
 	if err := os.MkdirAll(hlsDir, 0o755); err != nil {
 		return err
@@ -76,11 +77,30 @@ func (w *Worker) process(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	_, err = w.store.Update(id, func(v *store.Video) {
+	if _, err := w.store.Update(id, func(v *store.Video) {
 		v.Renditions = renditions
+		v.Status = store.StatusPublishing
+	}); err != nil {
+		return err
+	}
+
+	// 5. Upload chunks, playlists and thumbnail to storage.
+	masterKey, thumbKey, err := w.publish(ctx, id, hlsDir)
+	if err != nil {
+		return fmt.Errorf("publish: %w", err)
+	}
+	if _, err := w.store.Update(id, func(v *store.Video) {
+		v.MasterKey = masterKey
+		v.ThumbKey = thumbKey
 		v.Status = store.StatusReady
-	})
-	return err
+		v.Error = ""
+	}); err != nil {
+		return err
+	}
+
+	// Done: local copies are no longer needed.
+	os.Remove(w.cfg.SpoolPath(id, filepath.Ext(v.SourceKey)))
+	return nil
 }
 
 // localSource prefers the spooled upload; after a restart on another machine

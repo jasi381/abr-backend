@@ -45,6 +45,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /videos", s.handleListVideos)
 	mux.HandleFunc("GET /videos/{id}", s.handleGetVideo)
 	mux.HandleFunc("DELETE /videos/{id}", s.handleDeleteVideo)
+	mux.HandleFunc("GET /hls/{id}/{path...}", s.handleHLS)
 	return s.logRequests(mux)
 }
 

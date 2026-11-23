@@ -47,6 +47,9 @@ func run(log *slog.Logger) error {
 
 	wk := worker.New(cfg, st, blob, log)
 	wk.Start(ctx)
+	if n := wk.Recover(); n > 0 {
+		log.Info("re-queued unfinished videos", "count", n)
+	}
 
 	srv := api.New(cfg, st, blob, wk, log)
 	httpSrv := &http.Server{
