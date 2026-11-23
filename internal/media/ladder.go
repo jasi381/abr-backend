@@ -15,11 +15,14 @@ type Rung struct {
 	AudioKbps int
 }
 
-// Ladder is the default 3-step ladder, highest first.
+// Ladder is the default 5-step ladder, highest first. 360p and 144p keep
+// playback going on 3G-class and very bad networks, where 480p would stall.
 var Ladder = []Rung{
 	{Name: "1080p", Short: 1080, VideoKbps: 5000, MaxKbps: 5350, BufKbps: 7500, AudioKbps: 128},
 	{Name: "720p", Short: 720, VideoKbps: 2800, MaxKbps: 2996, BufKbps: 4200, AudioKbps: 128},
 	{Name: "480p", Short: 480, VideoKbps: 1400, MaxKbps: 1498, BufKbps: 2100, AudioKbps: 96},
+	{Name: "360p", Short: 360, VideoKbps: 800, MaxKbps: 856, BufKbps: 1200, AudioKbps: 96},
+	{Name: "144p", Short: 144, VideoKbps: 160, MaxKbps: 180, BufKbps: 240, AudioKbps: 64},
 }
 
 // Rendition is a rung fitted to a specific source.

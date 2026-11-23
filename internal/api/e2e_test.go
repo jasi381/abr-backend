@@ -137,7 +137,7 @@ func TestUploadToPlayableHLS(t *testing.T) {
 	if err := json.Unmarshal(final, &ready); err != nil {
 		t.Fatal(err)
 	}
-	if ready.Status != "ready" || len(ready.Renditions) != 2 || !strings.HasPrefix(ready.MasterURL, ts.URL+"/hls/") {
+	if ready.Status != "ready" || len(ready.Renditions) != 4 || !strings.HasPrefix(ready.MasterURL, ts.URL+"/hls/") {
 		t.Fatalf("ready payload = %+v", ready)
 	}
 
@@ -153,7 +153,8 @@ func TestUploadToPlayableHLS(t *testing.T) {
 
 	code, ct, master := get(ready.MasterURL)
 	if code != 200 || ct != "application/vnd.apple.mpegurl" ||
-		!strings.Contains(master, "720p/index.m3u8") || !strings.Contains(master, "480p/index.m3u8") {
+		!strings.Contains(master, "720p/index.m3u8") || !strings.Contains(master, "480p/index.m3u8") ||
+		!strings.Contains(master, "360p/index.m3u8") || !strings.Contains(master, "144p/index.m3u8") {
 		t.Fatalf("master: %d %s\n%s", code, ct, master)
 	}
 	base := strings.TrimSuffix(ready.MasterURL, "master.m3u8")

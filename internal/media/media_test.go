@@ -49,10 +49,11 @@ func TestPlanLadder(t *testing.T) {
 		src  ProbeResult
 		want []string
 	}{
-		{"1080p landscape", ProbeResult{Width: 1920, Height: 1080, FPS: 30}, []string{"1080p", "720p", "480p"}},
-		{"720p source never upscales", ProbeResult{Width: 1280, Height: 720, FPS: 30}, []string{"720p", "480p"}},
-		{"portrait reel uses short side", ProbeResult{Width: 1080, Height: 1920, FPS: 30}, []string{"1080p", "720p", "480p"}},
-		{"tiny source keeps its size", ProbeResult{Width: 640, Height: 361, FPS: 25}, []string{"360p"}},
+		{"1080p landscape", ProbeResult{Width: 1920, Height: 1080, FPS: 30}, []string{"1080p", "720p", "480p", "360p", "144p"}},
+		{"720p source never upscales", ProbeResult{Width: 1280, Height: 720, FPS: 30}, []string{"720p", "480p", "360p", "144p"}},
+		{"portrait reel uses short side", ProbeResult{Width: 1080, Height: 1920, FPS: 30}, []string{"1080p", "720p", "480p", "360p", "144p"}},
+		{"small source skips higher rungs", ProbeResult{Width: 640, Height: 361, FPS: 25}, []string{"360p", "144p"}},
+		{"tiny source keeps its size", ProbeResult{Width: 176, Height: 99, FPS: 25}, []string{"98p"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

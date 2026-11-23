@@ -1,6 +1,6 @@
 # ABR Lab — backend
 
-Upload an MP4, get back an adaptive HLS stream (1080p / 720p / 480p) that an
+Upload an MP4, get back an adaptive HLS stream (1080p / 720p / 480p / 360p / 144p) that an
 Android player can switch between on the fly. Go + FFmpeg + S3.
 
 ```
@@ -9,7 +9,7 @@ Android player can switch between on the fly. Go + FFmpeg + S3.
  POST /videos (mp4) ───────────────▶ spool to disk ─────────────────────────────▶ raw/{id}/source.mp4
                                      queue job
  GET /videos/{id}/events  ◀── SSE ── worker: ffprobe → plan ladder
-   step / progress / ready                   ffmpeg ×3 in parallel (aligned keyframes, 6 s chunks)
+   step / progress / ready                   ffmpeg ×5 in parallel (aligned keyframes, 6 s chunks)
                                              measure chunks → master.m3u8
                                              upload ────────────────────────────▶ hls/{id}/master.m3u8
                                                                                   hls/{id}/720p/index.m3u8
@@ -147,7 +147,7 @@ normally never build these URLs yourself — use `masterUrl`.
 ## What the pipeline does, and why
 
 - **Ladder by short side.** "1080p" means a 1080-px short side, so a portrait reel
-  (1080×1920) gets the same three qualities as landscape. Never upscales: a 720p upload gets 720p + 480p.
+  (1080×1920) gets the same five qualities as landscape. Never upscales: a 720p upload gets 720p + 480p + 360p + 144p.
 - **Aligned keyframes.** Every rendition gets a keyframe every `KEYFRAME_SECONDS`
   (`-force_key_frames`, `-sc_threshold 0`), so chunk N starts at the same moment in every quality
   and the player can switch at any chunk boundary without a glitch.
