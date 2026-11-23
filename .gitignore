@@ -1,4 +1,33 @@
+# Runtime data: video index, upload spool, ffmpeg scratch, local storage
 /data/
+
+# Build output
 /bin/
-.env
+/server
+*.exe
 *.test
+*.out
+coverage.*
+
+# Secrets: copy .env.example to .env locally
+.env
+.env.*
+!.env.example
+*.pem
+
+# Media files dropped in for manual testing
+*.mp4
+*.mov
+*.m4v
+*.mkv
+*.webm
+
+# Editors / IDEs
+.idea/
+.openidea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
