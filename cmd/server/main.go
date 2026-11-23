@@ -17,6 +17,7 @@ import (
 	"github.com/jasi381/abr-backend/internal/storage"
 	"github.com/jasi381/abr-backend/internal/storage/s3store"
 	"github.com/jasi381/abr-backend/internal/store"
+	"github.com/jasi381/abr-backend/internal/worker"
 )
 
 func main() {
@@ -44,7 +45,10 @@ func run(log *slog.Logger) error {
 		return err
 	}
 
-	srv := api.New(cfg, st, blob, nil, log)
+	wk := worker.New(cfg, st, blob, log)
+	wk.Start(ctx)
+
+	srv := api.New(cfg, st, blob, wk, log)
 	httpSrv := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           srv.Handler(),
